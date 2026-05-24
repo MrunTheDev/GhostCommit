@@ -1,4 +1,64 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hotelId",   "order": "ASCENDING"  },
+        { "fieldPath": "status",    "order": "ASCENDING"  },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",    "order": "ASCENDING"  },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hotelId",   "order": "ASCENDING"  },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "triage.notify_roles", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "status",              "order": "ASCENDING"      },
+        { "fieldPath": "createdAt",           "order": "DESCENDING"     }
+      ]
+    },
+    {
+      "collectionGroup": "staff",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hotelId",   "order": "ASCENDING" },
+        { "fieldPath": "role",      "order": "ASCENDING" },
+        { "fieldPath": "isOnDuty",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "dutyLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "staffId",   "order": "ASCENDING"  },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "riskPredictions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hotelId",     "order": "ASCENDING"  },
+        { "fieldPath": "generatedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

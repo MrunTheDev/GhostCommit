@@ -1,15 +1,145 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
+  match /databases/{db}/documents {
+
+    // ─────────────────────────────────────────
+    //  HELPERS
+    // ─────────────────────────────────────────
+
+    /** True if the caller is authenticated */
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    /** True if the caller has a staff document with the given role */
+    function hasRole(role) {
+      return isAuthed() &&
+        exists(/databases/$(db)/documents/staff/$(request.auth.uid)) &&
+        get(/databases/$(db)/documents/staff/$(request.auth.uid)).data.role == role;
+    }
+
+    /** True if the caller is any authenticated staff member */
+    function isAnyStaff() {
+      return isAuthed() &&
+        exists(/databases/$(db)/documents/staff/$(request.auth.uid));
+    }
+
+    /** True if the caller is Management (admin) */
+    function isManagement() {
+      return hasRole('Management');
+    }
+
+    /** True if caller owns this staff document */
+    function isOwner(staffId) {
+      return isAuthed() && request.auth.uid == staffId;
+    }
+
+
+    // ─────────────────────────────────────────
+    //  INCIDENTS  (Guest SOS + Staff SOS)
+    // ─────────────────────────────────────────
     match /incidents/{incidentId} {
-      allow create: if request.auth != null;
-      allow read, update: if request.auth != null;
+      // Guests (anonymous auth) may create incidents
+      allow create: if isAuthed();
+
+      // Any staff member may read incidents
+      allow read:   if isAnyStaff();
+
+      // Staff may update (add status updates, mark resolved)
+      // Management may do anything
+      allow update: if isAnyStaff();
+
+      // Only Management may delete
+      allow delete: if isManagement();
+
+      // ── Incident update subcollection ──────
+      match /updates/{updateId} {
+        allow read:   if isAnyStaff();
+        allow create: if isAnyStaff();
+        allow update: if isManagement();
+        allow delete: if isManagement();
+      }
     }
+
+
+    // ─────────────────────────────────────────
+    //  STAFF SOS  (panic button)
+    // ─────────────────────────────────────────
+    match /staffSOS/{sosId} {
+      // Any authenticated staff member may create their own SOS
+      allow create: if isAnyStaff() &&
+                       request.resource.data.staffId == request.auth.uid;
+
+      // Staff can read their own SOS; Management can read all
+      allow read: if isOwner(resource.data.staffId) || isManagement();
+
+      // Only Cloud Functions (server) may update (via Admin SDK — bypasses rules)
+      // Guard here against client-side update abuse
+      allow update: if isManagement();
+      allow delete: if isManagement();
+    }
+
+
+    // ─────────────────────────────────────────
+    //  STAFF PROFILES
+    // ─────────────────────────────────────────
     match /staff/{staffId} {
-      allow read, write: if request.auth != null;
+      // Each staff member reads their own profile;
+      // Management can read all staff docs
+      allow read: if isOwner(staffId) || isManagement();
+
+      // Staff can update their own non-sensitive fields
+      // (fcmToken, currentLocation, isOnDuty, dutyChangedAt, locationUpdatedAt)
+      allow update: if isOwner(staffId) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['fcmToken', 'currentLocation', 'isOnDuty',
+                    'dutyChangedAt', 'locationUpdatedAt']);
+
+      // Only Management may create/delete staff documents
+      allow create: if isManagement();
+      allow delete: if isManagement();
     }
+
+
+    // ─────────────────────────────────────────
+    //  DUTY LOGS
+    // ─────────────────────────────────────────
+    match /dutyLogs/{logId} {
+      // Logs are written by Cloud Functions (Admin SDK).
+      // Management can read them; staff can read their own.
+      allow read: if isManagement() ||
+        (isAnyStaff() && resource.data.staffId == request.auth.uid);
+      allow write: if false; // Cloud Functions only
+    }
+
+
+    // ─────────────────────────────────────────
+    //  HOTELS
+    // ─────────────────────────────────────────
     match /hotels/{hotelId} {
-      allow read, write: if request.auth != null;
+      // Any staff member may read hotel data (needed for SOS forms)
+      allow read: if isAnyStaff();
+
+      // Only Management may write hotel records
+      allow write: if isManagement();
+    }
+
+
+    // ─────────────────────────────────────────
+    //  ADMIN DASHBOARD — Risk Predictions
+    // ─────────────────────────────────────────
+    match /riskPredictions/{predId} {
+      allow read:  if isManagement();
+      allow write: if false; // Cloud Functions only
+    }
+
+
+    // ─────────────────────────────────────────
+    //  ADMIN DASHBOARD — Broadcasts
+    // ─────────────────────────────────────────
+    match /adminBroadcasts/{broadcastId} {
+      allow read:  if isManagement();
+      allow write: if false; // Cloud Functions only
     }
   }
 }
